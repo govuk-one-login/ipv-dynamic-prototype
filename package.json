@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "dev": "npx tsx src/simulator.ts",
+    "debug": "npx tsx --inspect-brk src/simulator.ts"
+  },
+  "devDependencies": {
+    "@tsconfig/node22": "^22.0.5",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.9.3"
+  }
+}
