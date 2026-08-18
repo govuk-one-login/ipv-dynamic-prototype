@@ -1,49 +1,45 @@
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import { CRI_CONFIG } from './cri-config.js';
+import { CRI_CONFIG, CriConfig } from './cri-config.js';
 import { calculateNextStep } from './engine';
-import { Action, CriId, ScoreType, UserState } from './types';
+import { applyOutcome } from './outcomes';
+import { Action, CriId, CriOutcome, ScoreType, UserState } from './types';
 
 const rl = readline.createInterface({ input, output });
 
 const initialState = (): UserState => ({
-  visited: [], 
-  hasData: { 
-    NAME: false, 
-    ADDRESS: false, 
-    DOB: false 
+  attempted: [],
+  succeeded: [],
+  hasData: {
+    NAME: false,
+    ADDRESS: false,
+    DOB: false
   },
   scores: {
     [ScoreType.STRENGTH]: 0,
     [ScoreType.VALIDITY]: 0,
     [ScoreType.FRAUD]: 0,
     [ScoreType.ACTIVITY]: 0,
-    [ScoreType.VERIFICATION]: 0,
-  }
+    [ScoreType.VERIFICATION]: 0
+  },
+  cis: []
 });
 
-const completeCriCheck = (state: UserState, criId: CriId): UserState => {
-  const cri = CRI_CONFIG.find(c => c.id === criId)!;
-  const newState: UserState = {
-    visited: [...state.visited, cri.checkType],
-    hasData: { ...state.hasData },
-    scores: { ...state.scores }
-  };
-  for (const [score, value] of Object.entries(cri.provides)) {
-    newState.scores[score as ScoreType] = Math.max(newState.scores[score as ScoreType], value);
+const pickOutcome = async (cri: CriConfig): Promise<CriOutcome> => {
+  if (cri.possibleOutcomes.length === 1) {
+    return cri.possibleOutcomes[0];
   }
-  for (const d of cri.collects) {
-    newState.hasData[d] = true;
-  }
-  return newState;
+  const prompt = cri.possibleOutcomes.map((o, i) => `  ${i + 1}: ${o}`).join('\n');
+  const answer = await rl.question(`Outcome of this check?\n${prompt}\n> `);
+  return cri.possibleOutcomes[parseInt(answer) - 1] ?? cri.possibleOutcomes[0];
 };
 
 const simulateJourney = async () => {
   let state = initialState();
 
   console.log('Welcome to Dynamic IPV.');
-  console.log('This prototype only covers a basic web proving journey targeting profiles M1A/M1B');
-  console.log('and a happy path that assumes all checks are successful with max possible scores achieved at each check.\n');
+  console.log('This prototype covers a basic web proving journey targeting profiles M1A/M1B.');
+  console.log('Each check can now succeed or fail (with or without raising a CI).\n');
 
   while (true) {
     const next = calculateNextStep(state);
@@ -60,15 +56,22 @@ const simulateJourney = async () => {
       const prompt = opts.map((o, i) => `  ${i + 1}: ${o.checkType}`).join('\n');
       const answer = await rl.question(`Pick an option:\n${prompt}\n> `);
       criId = opts[parseInt(answer) - 1]?.id;
-      if (!criId) { console.log('Invalid choice.'); continue; }
+      if (!criId) {
+        console.log('Invalid choice.');
+        continue;
+      }
     }
 
-    console.log(`${CRI_CONFIG.find(c => c.id === criId)!.checkType}`);
-    await rl.question('[Hit Enter to complete this step]');
+    const cri = CRI_CONFIG.find(c => c.id === criId)!;
+    console.log(`\n➡  ${cri.checkType}`);
 
-    state = completeCriCheck(state, criId!);
+    const outcome = await pickOutcome(cri);
+    state = applyOutcome(state, criId as CriId, outcome);
 
-    console.log('Scores:', state.scores, '\n');
+    console.log(`Outcome: ${outcome}`);
+    console.log('Scores:', state.scores);
+    if (state.cis.length) console.log('CIs:', state.cis);
+    console.log();
   }
 
   rl.close();

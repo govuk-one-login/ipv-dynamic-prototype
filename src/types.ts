@@ -30,6 +30,12 @@ export enum CheckType {
   KBV = 'Answer security questions'
 }
 
+export enum CriOutcome {
+  SUCCESS = 'SUCCESS',
+  FAIL_NO_CI = 'FAIL_NO_CI',
+  FAIL_WITH_CI = 'FAIL_WITH_CI'
+}
+
 export type Scores = Record<ScoreType, number>;
 
 export type TargetProfiles = Record<string, Scores>;
@@ -48,7 +54,9 @@ export type EngineResult =
   | { action: Action.STOP; message: string };
 
 export interface UserState {
-  visited: CheckType[];
+  attempted: CriId[];
+  succeeded: CriId[];
   hasData: Record<IdentityData, boolean>;
   scores: Scores;
+  cis: string[];
 }
