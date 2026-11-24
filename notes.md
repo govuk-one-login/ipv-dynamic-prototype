@@ -1,0 +1,1 @@
+If CRI in same group has lower possible scores but is preferred. How should we handle this scenario?
